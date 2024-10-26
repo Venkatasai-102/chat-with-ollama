@@ -19,18 +19,28 @@
         @keyup.enter="sendMessage" 
         placeholder="Type your message..." 
         rows="1"
+        :disabled="isSending"
         @input="adjustTextareaHeight"
       ></textarea>
-      <button @click="sendMessage">
+      <button 
+        @click="sendMessage" 
+        :disabled="isSending" 
+        :class="{ 'disabled': isSending }"
+      >
         <i class="send-icon"></i>
       </button>
     </div>
 
     <!-- Warning Note Section -->
-    <p class="info-text">LLMs can make mistakes. Check important info.</p>
+    <p class="info-text">*LLMs can make mistakes. Check important info.</p>
   </div>
 </template>
 
+---
+
+### Script
+
+```javascript
 <script>
 import axios from 'axios';
 
@@ -40,113 +50,144 @@ export default {
     return {
       userMessage: '',
       messages: [],
-      maxLines: 10, // Limit for text area growth
+      isSending: false, // New state to manage send button state
+      maxLines: 8, // Limit for textarea growth
     };
   },
   methods: {
     async sendMessage() {
-      if (this.userMessage.trim() === '') return;
+      if (this.userMessage.trim() === '' || this.isSending) return;
 
-      this.messages.push({ text: this.userMessage, isUser: true });
-
-      const requestData = { message: this.userMessage };
+      const message = this.userMessage; 
+      this.messages.push({ text: message, isUser: true });
+      this.userMessage = ''; // Clear input immediately
+      this.isSending = true; // Disable input and button
 
       try {
-        const response = await axios.post('http://127.0.0.1:8000/chat/', requestData);
+        const response = await axios.post('http://127.0.0.1:8000/chat/', { message });
         const botReply = response.data;
-
         this.messages.push({ text: botReply, isUser: false });
       } catch (error) {
         console.error('Error communicating with the backend:', error);
         this.messages.push({ text: 'Error: Could not get a response from the model', isUser: false });
+      } finally {
+        this.isSending = false; // Re-enable input and button
       }
-
-      this.userMessage = '';
     },
     adjustTextareaHeight(event) {
       const textarea = event.target;
-      textarea.style.height = 'auto'; // Reset height to auto
-      textarea.style.height = `${Math.min(textarea.scrollHeight, this.maxLines * 24)}px`; // Limit growth
+      textarea.style.height = 'auto'; // Reset height
+      textarea.style.height = `${Math.min(textarea.scrollHeight, this.maxLines * 24)}px`; // Adjust height
     }
   }
 };
 </script>
+<style>
+/* GLOBAL CSS RESET: Ensure no browser defaults interfere */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-<style scoped>
+/* Ensure html and body take the full height and background is applied */
+html, body {
+  height: 100vh;
+  width: 100vw;
+  background-color: #141414; /* Outside area background */
+  overflow: hidden; /* Prevent any scrolling */
+}
+
+/* Chat container styling */
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100vh; /* Full vertical height */
-  width: 600px;
-  margin: 0 auto;
-  border: 1px solid #ccc;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-  background-color: white;
+  height: 95vh;
+  width: 70vw;
+  margin: auto;
+  margin-top: 20px;
+  background-color: #282828; /* Chat window background */
   border-radius: 15px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-/* Chat Window: Holds previous chats and adjusts as input grows */
+/* Chat window area */
 .chat-window {
-  flex: 1; /* Takes most available space initially */
+  flex: 1;
   padding: 15px;
   overflow-y: auto;
-  border-bottom: 1px solid #ccc;
+  color: white;
+  scrollbar-width: thin;
+  scrollbar-color: #444 #282828;
 }
 
+/* Messages styling */
 .message {
   margin: 8px 0;
 }
 
 .user {
   text-align: right;
-  background-color: #e0ffe0;
+  background-color: #3c3c3c;
   border-radius: 15px;
   padding: 10px;
+  color: white;
 }
 
 .bot {
   text-align: left;
-  background-color: #e0e0ff;
+  background-color: #262621;
   border-radius: 15px;
   padding: 10px;
+  color: white;
 }
 
-/* Chat Input: Flexible height with growing textarea */
+/* Chat input styling */
 .chat-input {
   display: flex;
   align-items: flex-end;
   padding: 10px;
   gap: 10px;
-  background-color: #f8f8f8;
-  border-bottom: 1px solid #ccc;
+  background-color: #1e1e1e;
+  border-radius: 0 0 15px 15px;
 }
 
 .chat-input textarea {
   flex: 1;
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid #333;
   border-radius: 15px;
-  resize: none; /* Disable manual resizing */
-  overflow-y: hidden; /* Avoid scrollbar */
+  resize: none;
+  overflow-y: hidden;
   font-size: 14px;
+  background-color: #282828;
+  color: white;
+  outline: none;
 }
 
 .chat-input button {
   background-color: #007bff;
   border: none;
   padding: 10px;
-  border-radius: 50%; /* Circle button */
+  border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
-.chat-input button:hover {
+.chat-input button.disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.chat-input button:hover:not(.disabled) {
   background-color: #0056b3;
 }
 
-/* Send Icon Styles */
+/* Send icon */
 .send-icon {
   width: 20px;
   height: 20px;
@@ -155,11 +196,11 @@ export default {
   background-repeat: no-repeat;
 }
 
-/* Warning Text: Always at the bottom */
+/* Info text */
 .info-text {
   text-align: center;
   font-size: 12px;
-  color: #666;
+  color: #bbb;
   margin: 5px 0;
 }
 </style>
